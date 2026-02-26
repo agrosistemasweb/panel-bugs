@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Bugs - Sprint 3 Modulo Contable</title>
+    <title>Panel de Bugs - Modulo Contable</title>
     <style>
         :root {
             --bg: #0f1117;
@@ -378,6 +378,72 @@
         .toast.error { border-left: 3px solid var(--danger); }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } }
 
+        /* Attachments */
+        .attachments-section h3 {
+            font-size: 14px; font-weight: 600;
+            margin-bottom: 12px;
+        }
+        .attachments-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .attachment-card {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .attachment-card:hover { border-color: var(--accent); }
+        .attachment-card img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            display: block;
+        }
+        .attachment-card .att-name {
+            padding: 8px 10px;
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .attachment-file {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            font-size: 12px;
+            color: var(--text);
+        }
+        .attachment-file-icon {
+            font-size: 20px;
+            opacity: 0.6;
+        }
+
+        /* Image lightbox */
+        .lightbox {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+        .lightbox.active { display: flex; }
+        .lightbox img {
+            max-width: 90vw;
+            max-height: 90vh;
+            border-radius: 8px;
+            box-shadow: 0 4px 40px rgba(0,0,0,0.5);
+        }
+
         /* Config banner */
         .config-banner {
             background: #f59e0b22;
@@ -407,7 +473,12 @@
     <!-- Header -->
     <div class="header">
         <h1>
-            Sprint 3 - Modulo Contable
+            <select class="filter-select" id="sprintSelector" onchange="onSprintChange()" style="font-size:18px;font-weight:600;padding:6px 12px;border-radius:8px;">
+                <option value="901323690606">Sprint 1 - Modulo Contable</option>
+                <option value="901324230121">Sprint 2 - Modulo Contable</option>
+                <option value="901324539845" selected>Sprint 3 - Modulo Contable</option>
+                <option value="901325316130">Sprint 4 - Modulo Contable</option>
+            </select>
             <span class="badge" id="totalBadge">...</span>
         </h1>
         <div class="header-actions">
@@ -421,8 +492,8 @@
         <div class="stat-card"><div class="label">Total</div><div class="value" id="statTotal">-</div></div>
         <div class="stat-card"><div class="label">To Do</div><div class="value" style="color:#87909e" id="statTodo">-</div></div>
         <div class="stat-card"><div class="label">In Progress</div><div class="value" style="color:#1090e0" id="statProgress">-</div></div>
-        <div class="stat-card"><div class="label">Blocked</div><div class="value" style="color:#d33d44" id="statBlocked">-</div></div>
-        <div class="stat-card"><div class="label">Review</div><div class="value" style="color:#b660e0" id="statReview">-</div></div>
+        <div class="stat-card"><div class="label">Waiting QA</div><div class="value" style="color:#ffc53d" id="statWaitingQa">-</div></div>
+        <div class="stat-card"><div class="label">QA</div><div class="value" style="color:#1090e0" id="statQa">-</div></div>
         <div class="stat-card"><div class="label">Done</div><div class="value" style="color:#22c55e" id="statDone">-</div></div>
     </div>
 
@@ -503,6 +574,10 @@
                 <div class="modal-meta" id="modalMeta"></div>
                 <h3 style="font-size:13px; color:var(--text-muted); margin-bottom:8px;">DESCRIPCION</h3>
                 <div class="description-block" id="modalDescription"></div>
+                <div class="attachments-section" id="attachmentsSection" style="display:none">
+                    <h3>Adjuntos <span id="attachmentCount" style="font-size:12px; color:var(--text-muted)"></span></h3>
+                    <div class="attachments-grid" id="attachmentsGrid"></div>
+                </div>
                 <div class="comments-section">
                     <h3>Comentarios <span id="commentCount" style="font-size:12px; color:var(--text-muted)"></span></h3>
                     <div id="commentsList"></div>
@@ -515,16 +590,26 @@
         </div>
     </div>
 
+    <!-- Lightbox -->
+    <div class="lightbox" id="lightbox" onclick="this.classList.remove('active')">
+        <img id="lightboxImg" src="" alt="">
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script>
         // =============================================================
         // CONFIGURACION
         // =============================================================
-        // URL del Cloudflare Worker (cambiar despues del deploy)
+        // URL del Cloudflare Worker
         const WORKER_URL = 'https://broad-dust-3884.matiasgumma.workers.dev';
-        const LIST_ID = '901324539845';
+        let LIST_ID = '901324539845';
         // =============================================================
+
+        function onSprintChange() {
+            LIST_ID = document.getElementById('sprintSelector').value;
+            loadTasks();
+        }
 
         let allTasks = [];
         let filteredTasks = [];
@@ -534,8 +619,9 @@
 
         const STATUS_COLORS = {
             'to do': '#87909e', 'in progress': '#1090e0',
-            'blocked': '#d33d44', 'review': '#b660e0',
-            'done': '#22c55e', 'closed': '#008844'
+            'blocked': '#f76808', 'review': '#ab4aba',
+            'waiting qa': '#ffc53d', 'qa': '#1090e0',
+            'done': '#12a594', 'closed': '#008844'
         };
         const PRIORITY_CONFIG = {
             'urgent': { color: '#f50000', label: 'Urgente' },
@@ -758,8 +844,8 @@
             document.getElementById('statTotal').textContent = allTasks.length;
             document.getElementById('statTodo').textContent = allTasks.filter(t => t.status === 'to do').length;
             document.getElementById('statProgress').textContent = allTasks.filter(t => t.status === 'in progress').length;
-            document.getElementById('statBlocked').textContent = allTasks.filter(t => t.status === 'blocked').length;
-            document.getElementById('statReview').textContent = allTasks.filter(t => t.status === 'review').length;
+            document.getElementById('statWaitingQa').textContent = allTasks.filter(t => t.status === 'waiting qa').length;
+            document.getElementById('statQa').textContent = allTasks.filter(t => t.status === 'qa').length;
             document.getElementById('statDone').textContent = allTasks.filter(t => ['done','closed'].includes(t.status)).length;
         }
 
@@ -787,6 +873,10 @@
             `;
 
             document.getElementById('modalDescription').textContent = task.description || '(Sin descripcion)';
+
+            // Load attachments from task detail
+            loadAttachments(taskId);
+
             await loadComments(taskId);
             document.getElementById('modalOverlay').classList.add('active');
             document.body.style.overflow = 'hidden';
@@ -797,6 +887,55 @@
             document.getElementById('modalOverlay').classList.remove('active');
             document.body.style.overflow = '';
             currentTaskId = null;
+        }
+
+        async function loadAttachments(taskId) {
+            const section = document.getElementById('attachmentsSection');
+            const grid = document.getElementById('attachmentsGrid');
+            section.style.display = 'none';
+            grid.innerHTML = '';
+            try {
+                const data = await apiGet(`/api/task/${taskId}`);
+                const attachments = data.attachments || [];
+                if (attachments.length === 0) return;
+
+                document.getElementById('attachmentCount').textContent = `(${attachments.length})`;
+                section.style.display = 'block';
+
+                const imageExts = ['png','jpg','jpeg','gif','webp','bmp','svg'];
+
+                attachments.forEach(att => {
+                    const card = document.createElement('div');
+                    card.className = 'attachment-card';
+                    const ext = (att.extension || '').toLowerCase();
+                    const isImage = imageExts.includes(ext);
+
+                    if (isImage) {
+                        const thumbUrl = att.thumbnail_large || att.thumbnail_small || att.url;
+                        card.innerHTML = `
+                            <img src="${thumbUrl}" alt="${escapeHtml(att.title || 'imagen')}" loading="lazy" onerror="this.style.display='none'">
+                            <div class="att-name">${escapeHtml(att.title || 'imagen.' + ext)}</div>
+                        `;
+                        card.onclick = () => openLightbox(att.url);
+                    } else {
+                        card.innerHTML = `
+                            <div class="attachment-file">
+                                <span class="attachment-file-icon">&#128196;</span>
+                                <span>${escapeHtml(att.title || 'archivo.' + ext)}</span>
+                            </div>
+                        `;
+                        card.onclick = () => window.open(att.url, '_blank');
+                    }
+                    grid.appendChild(card);
+                });
+            } catch (err) {
+                // Silently fail - attachments are optional
+            }
+        }
+
+        function openLightbox(url) {
+            document.getElementById('lightboxImg').src = url;
+            document.getElementById('lightbox').classList.add('active');
         }
 
         async function loadComments(taskId) {

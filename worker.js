@@ -62,6 +62,17 @@ export default {
         return jsonResponse(data, resp.status, request);
       }
 
+      // ---- GET /api/task/:id (detalle con attachments) ----
+      if (path.match(/^\/api\/task\/[^/]+$/) && !path.includes('/comment') && request.method === 'GET') {
+        const taskId = path.split('/')[3];
+        const resp = await fetch(
+          `${CLICKUP_API}/task/${taskId}?include_subtasks=true`,
+          { headers: { 'Authorization': API_TOKEN } }
+        );
+        const data = await resp.json();
+        return jsonResponse(data, resp.status, request);
+      }
+
       // ---- GET /api/task/:id/comment ----
       if (path.match(/^\/api\/task\/[^/]+\/comment$/) && request.method === 'GET') {
         const taskId = path.split('/')[3];
@@ -113,6 +124,7 @@ export default {
       // Ruta no encontrada
       return jsonResponse({ error: 'Ruta no encontrada', rutas: [
         'GET /api/tasks?list_id=XXX',
+        'GET /api/task/:id',
         'GET /api/task/:id/comment',
         'POST /api/task/:id/comment',
         'GET /api/list/:id/field'
