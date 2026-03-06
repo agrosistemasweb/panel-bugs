@@ -444,6 +444,82 @@
             box-shadow: 0 4px 40px rgba(0,0,0,0.5);
         }
 
+        /* Server Monitor */
+        .servers-section {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+        }
+        .servers-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .servers-header h2 {
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .servers-header .toggle-icon {
+            font-size: 12px;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+        .servers-header .toggle-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+        .servers-grid {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .servers-grid.collapsed { display: none; }
+        .server-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 18px;
+            flex: 1;
+            min-width: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            transition: border-color 0.3s;
+        }
+        .server-card:hover { border-color: var(--accent); }
+        .server-card .srv-info { flex: 1; }
+        .server-card .srv-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+        .server-card .srv-url { font-size: 11px; color: var(--text-muted); word-break: break-all; }
+        .server-card .srv-status { text-align: right; min-width: 100px; }
+        .srv-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .srv-badge.online { background: #22c55e22; color: #22c55e; border: 1px solid #22c55e44; }
+        .srv-badge.offline { background: #ef444422; color: #ef4444; border: 1px solid #ef444444; }
+        .srv-badge.checking { background: #f59e0b22; color: #f59e0b; border: 1px solid #f59e0b44; }
+        .srv-response { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+        .srv-actions { display: flex; align-items: center; gap: 8px; }
+        .srv-refresh-btn {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        .srv-refresh-btn:hover { background: var(--border); color: var(--text); }
+
         /* Config banner */
         .config-banner {
             background: #f59e0b22;
@@ -468,6 +544,18 @@
     <!-- Config banner -->
     <div class="config-banner" id="configBanner">
         El proxy no esta configurado. Revisa la variable WORKER_URL en el codigo.
+    </div>
+
+    <!-- Servers Monitor -->
+    <div class="servers-section">
+        <div class="servers-header" onclick="toggleServers()">
+            <h2>&#9881; Servidores <span id="srvSummary" style="font-size:12px;color:var(--text-muted);font-weight:400"></span></h2>
+            <div class="srv-actions">
+                <button class="srv-refresh-btn" onclick="event.stopPropagation(); checkAllServers()">Verificar</button>
+                <span class="toggle-icon" id="srvToggleIcon">&#9660;</span>
+            </div>
+        </div>
+        <div class="servers-grid" id="serversGrid"></div>
     </div>
 
     <!-- Header -->
@@ -986,6 +1074,75 @@
             setTimeout(() => t.style.display = 'none', 3000);
         }
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+        // ---- Server Monitor ----
+        const SERVERS = [
+            { name: "Produccion", url: "https://app.agrosistemas.com.ar/" },
+            { name: "Desarrollo", url: "https://devapp.agrosistemas.com.ar/" }
+        ];
+        let serverStates = {};
+
+        function toggleServers() {
+            const grid = document.getElementById('serversGrid');
+            const icon = document.getElementById('srvToggleIcon');
+            grid.classList.toggle('collapsed');
+            icon.classList.toggle('collapsed');
+        }
+
+        function renderServers() {
+            const grid = document.getElementById('serversGrid');
+            grid.innerHTML = SERVERS.map((s, i) => {
+                const st = serverStates[s.url] || { status: 'checking' };
+                const badgeClass = st.status === 'online' ? 'online' : st.status === 'offline' ? 'offline' : 'checking';
+                const badgeText = st.status === 'online' ? 'ACTIVO' : st.status === 'offline' ? 'INACTIVO' : 'VERIFICANDO...';
+                const timeText = st.time != null ? st.time + ' ms' : '';
+                return `<div class="server-card">
+                    <div class="srv-info">
+                        <div class="srv-name">${escapeHtml(s.name)}</div>
+                        <div class="srv-url">${escapeHtml(s.url)}</div>
+                    </div>
+                    <div class="srv-status">
+                        <div><span class="srv-badge ${badgeClass}">${badgeText}</span></div>
+                        <div class="srv-response">${timeText}</div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            // Update summary
+            const online = SERVERS.filter(s => serverStates[s.url]?.status === 'online').length;
+            const total = SERVERS.length;
+            const summary = document.getElementById('srvSummary');
+            if (Object.keys(serverStates).length > 0) {
+                summary.textContent = `(${online}/${total} activos)`;
+                summary.style.color = online === total ? '#22c55e' : '#ef4444';
+            }
+        }
+
+        async function checkServer(index) {
+            const s = SERVERS[index];
+            serverStates[s.url] = { status: 'checking', time: null };
+            renderServers();
+            const start = performance.now();
+            try {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 10000);
+                await fetch(s.url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: controller.signal });
+                clearTimeout(timeout);
+                serverStates[s.url] = { status: 'online', time: Math.round(performance.now() - start) };
+            } catch (err) {
+                serverStates[s.url] = { status: 'offline', time: Math.round(performance.now() - start) };
+            }
+            renderServers();
+        }
+
+        async function checkAllServers() {
+            await Promise.all(SERVERS.map((_, i) => checkServer(i)));
+        }
+
+        // Init servers
+        renderServers();
+        checkAllServers();
+        setInterval(checkAllServers, 60000); // Auto-check cada 1 minuto
 
         // Init
         loadTasks();
