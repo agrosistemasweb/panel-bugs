@@ -519,6 +519,16 @@
             transition: all 0.2s;
         }
         .srv-refresh-btn:hover { background: var(--border); color: var(--text); }
+        .server-card.srv-down { border-color: #ef444466; background: #ef444408; }
+        .srv-error {
+            font-size: 11px;
+            color: #ef4444;
+            margin-top: 4px;
+            padding: 3px 8px;
+            background: #ef444415;
+            border-radius: 4px;
+            border-left: 2px solid #ef4444;
+        }
 
         /* Config banner */
         .config-banner {
@@ -1096,14 +1106,18 @@
                 const badgeClass = st.status === 'online' ? 'online' : st.status === 'offline' ? 'offline' : 'checking';
                 const badgeText = st.status === 'online' ? 'ACTIVO' : st.status === 'offline' ? 'INACTIVO' : 'VERIFICANDO...';
                 const timeText = st.time != null ? st.time + ' ms' : '';
-                return `<div class="server-card">
+                const errorText = st.error ? `<div class="srv-error">${escapeHtml(st.error)}</div>` : '';
+                const lastCheck = st.lastCheck ? `<div class="srv-response">Ultima: ${st.lastCheck}</div>` : '';
+                return `<div class="server-card${st.status === 'offline' ? ' srv-down' : ''}">
                     <div class="srv-info">
                         <div class="srv-name">${escapeHtml(s.name)}</div>
                         <div class="srv-url">${escapeHtml(s.url)}</div>
+                        ${errorText}
                     </div>
                     <div class="srv-status">
                         <div><span class="srv-badge ${badgeClass}">${badgeText}</span></div>
                         <div class="srv-response">${timeText}</div>
+                        ${lastCheck}
                     </div>
                 </div>`;
             }).join('');
@@ -1128,9 +1142,21 @@
                 const timeout = setTimeout(() => controller.abort(), 10000);
                 await fetch(s.url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: controller.signal });
                 clearTimeout(timeout);
-                serverStates[s.url] = { status: 'online', time: Math.round(performance.now() - start) };
+                const now = new Date().toLocaleTimeString('es-AR');
+                serverStates[s.url] = { status: 'online', time: Math.round(performance.now() - start), error: null, lastCheck: now };
             } catch (err) {
-                serverStates[s.url] = { status: 'offline', time: Math.round(performance.now() - start) };
+                let errorMsg = 'Sin respuesta del servidor';
+                if (err.name === 'AbortError') {
+                    errorMsg = 'Timeout - El servidor no responde (>10s)';
+                } else if (err.message.includes('Failed to fetch')) {
+                    errorMsg = 'No se pudo conectar - Servidor caido o sin red';
+                } else if (err.message.includes('NetworkError')) {
+                    errorMsg = 'Error de red - Sin conexion a internet';
+                } else if (err.message) {
+                    errorMsg = err.message;
+                }
+                const now = new Date().toLocaleTimeString('es-AR');
+                serverStates[s.url] = { status: 'offline', time: Math.round(performance.now() - start), error: errorMsg, lastCheck: now };
             }
             renderServers();
         }
