@@ -973,7 +973,8 @@
             document.getElementById('statTotal').textContent = allTasks.length;
             document.getElementById('statWaitingQa').textContent = allTasks.filter(t => t.status === 'waiting qa').length;
             document.getElementById('statQa').textContent = allTasks.filter(t => t.status === 'qa').length;
-            const nameMatch = (assignees, search) => assignees.some(a => a.name.toLowerCase().includes(search));
+            const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+            const nameMatch = (assignees, search) => assignees.some(a => norm(a.name).includes(search));
             document.getElementById('statLucia').textContent = allTasks.filter(t => nameMatch(t.assignees, 'lucia') || nameMatch(t.assignees, 'campisi')).length;
             document.getElementById('statCapacitacion').textContent = allTasks.filter(t => nameMatch(t.assignees, 'capacitacion')).length;
             document.getElementById('statLaura').textContent = allTasks.filter(t => nameMatch(t.assignees, 'laura') && t.status === 'qa').length;
