@@ -149,6 +149,42 @@
             border-color: var(--accent);
         }
 
+        /* Custom dropdown */
+        .custom-dropdown { position: relative; display: inline-block; }
+        .custom-dropdown-selected {
+            cursor: pointer;
+            min-width: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+        }
+        .custom-dropdown-selected::after { content: '\25BC'; font-size: 10px; color: var(--text-muted); }
+        .custom-dropdown-options {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 200;
+            min-width: 160px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+            margin-top: 2px;
+        }
+        .custom-dropdown-options.open { display: block; }
+        .custom-dropdown-option {
+            padding: 6px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            color: var(--text);
+        }
+        .custom-dropdown-option:hover { background: var(--surface2); }
+        .custom-dropdown-option.active { background: var(--accent); color: white; }
+
         /* Tasks */
         .tasks-container { padding: 16px 24px; }
         .tasks-count { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
@@ -632,9 +668,12 @@
                 <option value="Alta">Alta</option>
             </select>
         </div>
-        <div class="filter-group">
+        <div class="filter-group" style="position:relative;">
             <label>Tags:</label>
-            <select class="filter-select" id="filterTag" onchange="activeTag = this.value; applyFilters();"><option value="">Todos</option></select>
+            <div class="custom-dropdown" id="tagDropdown">
+                <div class="custom-dropdown-selected filter-select" onclick="toggleTagDropdown(event)">Todos</div>
+                <div class="custom-dropdown-options" id="tagDropdownOptions"></div>
+            </div>
         </div>
     </div>
 
@@ -840,9 +879,9 @@
             assignees.forEach(a => { aSel.innerHTML += `<option value="${a}">${a}</option>`; });
 
             const tags = [...new Set(allTasks.flatMap(t => t.tags))].sort();
-            const tagSel = document.getElementById('filterTag');
-            tagSel.innerHTML = '<option value="">Todos</option>';
-            tags.forEach(tag => { tagSel.innerHTML += `<option value="${tag}"${activeTag === tag ? ' selected' : ''}>${tag}</option>`; });
+            const tagOpts = document.getElementById('tagDropdownOptions');
+            tagOpts.innerHTML = '<div class="custom-dropdown-option' + (!activeTag ? ' active' : '') + '" onclick="selectTag(\'\')">Todos</div>';
+            tags.forEach(tag => { tagOpts.innerHTML += `<div class="custom-dropdown-option${activeTag === tag ? ' active' : ''}" onclick="selectTag('${tag.replace(/'/g, "\\'")}')">${tag}</div>`; });
         }
 
         function applyFilters() {
@@ -1078,6 +1117,20 @@
             setTimeout(() => t.style.display = 'none', 3000);
         }
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+        // ---- Custom Tag Dropdown ----
+        function toggleTagDropdown(e) {
+            e.stopPropagation();
+            document.getElementById('tagDropdownOptions').classList.toggle('open');
+        }
+        function selectTag(tag) {
+            activeTag = tag;
+            document.getElementById('tagDropdownOptions').classList.remove('open');
+            document.querySelector('#tagDropdown .custom-dropdown-selected').textContent = tag || 'Todos';
+            applyFilters();
+            populateFilters();
+        }
+        document.addEventListener('click', () => { document.getElementById('tagDropdownOptions').classList.remove('open'); });
 
         // ---- Server Monitor ----
         const SERVERS = [
