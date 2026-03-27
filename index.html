@@ -574,8 +574,8 @@
             <select class="filter-select" id="sprintSelector" onchange="onSprintChange()" style="font-size:18px;font-weight:600;padding:6px 12px;border-radius:8px;">
                 <option value="901323690606">Sprint 1 - Modulo Contable</option>
                 <option value="901324230121">Sprint 2 - Modulo Contable</option>
-                <option value="901324539845" selected>Sprint 3 - Modulo Contable</option>
-                <option value="901325316130">Sprint 4 - Modulo Contable</option>
+                <option value="901324539845">Sprint 3 - Modulo Contable</option>
+                <option value="901325316130" selected>Sprint 4 - Modulo Contable</option>
             </select>
             <span class="badge" id="totalBadge">...</span>
         </h1>
@@ -590,9 +590,12 @@
         <div class="stat-card"><div class="label">Total</div><div class="value" id="statTotal">-</div></div>
         <div class="stat-card"><div class="label">To Do</div><div class="value" style="color:#87909e" id="statTodo">-</div></div>
         <div class="stat-card"><div class="label">In Progress</div><div class="value" style="color:#1090e0" id="statProgress">-</div></div>
-        <div class="stat-card"><div class="label">Waiting QA</div><div class="value" style="color:#ffc53d" id="statWaitingQa">-</div></div>
+        <div class="stat-card"><div class="label">Pendiente Testear</div><div class="value" style="color:#ffc53d" id="statWaitingQa">-</div></div>
         <div class="stat-card"><div class="label">QA</div><div class="value" style="color:#1090e0" id="statQa">-</div></div>
         <div class="stat-card"><div class="label">Done</div><div class="value" style="color:#22c55e" id="statDone">-</div></div>
+        <div class="stat-card"><div class="label">Lucia Campisi</div><div class="value" style="color:#ec4899" id="statLucia">-</div></div>
+        <div class="stat-card"><div class="label">Capacitacion AS</div><div class="value" style="color:#f59e0b" id="statCapacitacion">-</div></div>
+        <div class="stat-card"><div class="label">Laura (QA)</div><div class="value" style="color:#8b5cf6" id="statLaura">-</div></div>
     </div>
 
     <!-- Filters -->
@@ -631,7 +634,7 @@
         </div>
         <div class="filter-group">
             <label>Tags:</label>
-            <div class="tag-filters" id="tagFilters"></div>
+            <select class="filter-select" id="filterTag" onchange="activeTag = this.value; applyFilters();"><option value="">Todos</option></select>
         </div>
     </div>
 
@@ -701,7 +704,7 @@
         // =============================================================
         // URL del Cloudflare Worker
         const WORKER_URL = 'https://panel-bugs-proxy.lorena-ruiz-e63.workers.dev';
-        let LIST_ID = '901324539845';
+        let LIST_ID = '901325316130';
         // =============================================================
 
         function onSprintChange() {
@@ -837,20 +840,9 @@
             assignees.forEach(a => { aSel.innerHTML += `<option value="${a}">${a}</option>`; });
 
             const tags = [...new Set(allTasks.flatMap(t => t.tags))].sort();
-            const tc = document.getElementById('tagFilters');
-            tc.innerHTML = '';
-            tags.forEach(tag => {
-                const pill = document.createElement('span');
-                pill.className = 'tag-pill';
-                pill.textContent = tag;
-                pill.onclick = () => {
-                    activeTag = activeTag === tag ? '' : tag;
-                    document.querySelectorAll('.tag-pill').forEach(p => p.classList.remove('active'));
-                    if (activeTag) pill.classList.add('active');
-                    applyFilters();
-                };
-                tc.appendChild(pill);
-            });
+            const tagSel = document.getElementById('filterTag');
+            tagSel.innerHTML = '<option value="">Todos</option>';
+            tags.forEach(tag => { tagSel.innerHTML += `<option value="${tag}"${activeTag === tag ? ' selected' : ''}>${tag}</option>`; });
         }
 
         function applyFilters() {
@@ -945,6 +937,11 @@
             document.getElementById('statWaitingQa').textContent = allTasks.filter(t => t.status === 'waiting qa').length;
             document.getElementById('statQa').textContent = allTasks.filter(t => t.status === 'qa').length;
             document.getElementById('statDone').textContent = allTasks.filter(t => ['done','closed'].includes(t.status)).length;
+            // Totalizadores por asignado
+            const nameMatch = (assignees, search) => assignees.some(a => a.name.toLowerCase().includes(search));
+            document.getElementById('statLucia').textContent = allTasks.filter(t => nameMatch(t.assignees, 'lucia') || nameMatch(t.assignees, 'campisi')).length;
+            document.getElementById('statCapacitacion').textContent = allTasks.filter(t => nameMatch(t.assignees, 'capacitacion')).length;
+            document.getElementById('statLaura').textContent = allTasks.filter(t => nameMatch(t.assignees, 'laura') && t.status === 'qa').length;
         }
 
         // ---- Modal ----
