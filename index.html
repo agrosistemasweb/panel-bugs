@@ -86,7 +86,7 @@
             border: 1px solid var(--border);
             border-radius: 12px;
             padding: 16px 20px;
-            min-width: 140px;
+            min-width: 0;
             flex: 1;
         }
         .stat-card .label {
@@ -581,6 +581,7 @@
         </h1>
         <div class="header-actions">
             <span class="last-updated" id="lastUpdated"></span>
+            <button class="btn-refresh" onclick="exportPDF()">Exportar PDF</button>
             <button class="btn-refresh" onclick="loadTasks()">Actualizar</button>
         </div>
     </div>
@@ -588,14 +589,12 @@
     <!-- Stats -->
     <div class="stats-bar">
         <div class="stat-card"><div class="label">Total</div><div class="value" id="statTotal">-</div></div>
-        <div class="stat-card"><div class="label">To Do</div><div class="value" style="color:#87909e" id="statTodo">-</div></div>
-        <div class="stat-card"><div class="label">In Progress</div><div class="value" style="color:#1090e0" id="statProgress">-</div></div>
         <div class="stat-card"><div class="label">Pendiente Testear</div><div class="value" style="color:#ffc53d" id="statWaitingQa">-</div></div>
         <div class="stat-card"><div class="label">QA</div><div class="value" style="color:#1090e0" id="statQa">-</div></div>
-        <div class="stat-card"><div class="label">Done</div><div class="value" style="color:#22c55e" id="statDone">-</div></div>
         <div class="stat-card"><div class="label">Lucia Campisi</div><div class="value" style="color:#ec4899" id="statLucia">-</div></div>
         <div class="stat-card"><div class="label">Capacitacion AS</div><div class="value" style="color:#f59e0b" id="statCapacitacion">-</div></div>
         <div class="stat-card"><div class="label">Laura (QA)</div><div class="value" style="color:#8b5cf6" id="statLaura">-</div></div>
+        <div class="stat-card"><div class="label">Lorena Ruiz</div><div class="value" style="color:#3b82f6" id="statLorena">-</div></div>
     </div>
 
     <!-- Filters -->
@@ -932,16 +931,13 @@
 
         function updateStats() {
             document.getElementById('statTotal').textContent = allTasks.length;
-            document.getElementById('statTodo').textContent = allTasks.filter(t => t.status === 'to do').length;
-            document.getElementById('statProgress').textContent = allTasks.filter(t => t.status === 'in progress').length;
             document.getElementById('statWaitingQa').textContent = allTasks.filter(t => t.status === 'waiting qa').length;
             document.getElementById('statQa').textContent = allTasks.filter(t => t.status === 'qa').length;
-            document.getElementById('statDone').textContent = allTasks.filter(t => ['done','closed'].includes(t.status)).length;
-            // Totalizadores por asignado
             const nameMatch = (assignees, search) => assignees.some(a => a.name.toLowerCase().includes(search));
             document.getElementById('statLucia').textContent = allTasks.filter(t => nameMatch(t.assignees, 'lucia') || nameMatch(t.assignees, 'campisi')).length;
             document.getElementById('statCapacitacion').textContent = allTasks.filter(t => nameMatch(t.assignees, 'capacitacion')).length;
             document.getElementById('statLaura').textContent = allTasks.filter(t => nameMatch(t.assignees, 'laura') && t.status === 'qa').length;
+            document.getElementById('statLorena').textContent = allTasks.filter(t => nameMatch(t.assignees, 'lorena') || nameMatch(t.assignees, 'ruiz')).length;
         }
 
         // ---- Modal ----
@@ -1166,6 +1162,64 @@
         renderServers();
         checkAllServers();
         setInterval(checkAllServers, 60000); // Auto-check cada 1 minuto
+
+        // ---- Exportar PDF ----
+        function exportPDF() {
+            const sprint = document.getElementById('sprintSelector');
+            const sprintName = sprint.options[sprint.selectedIndex].text;
+            const now = new Date().toLocaleDateString('es-AR');
+
+            let html = `<html><head><meta charset="UTF-8"><title>Informe ${sprintName}</title><style>
+                body { font-family: Arial, sans-serif; font-size: 11px; color: #222; padding: 20px; }
+                h1 { font-size: 18px; margin-bottom: 4px; }
+                .subtitle { color: #666; font-size: 12px; margin-bottom: 16px; }
+                .stats { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+                .stat { background: #f5f5f5; border-radius: 8px; padding: 10px 16px; text-align: center; }
+                .stat .val { font-size: 22px; font-weight: 700; }
+                .stat .lbl { font-size: 10px; color: #666; text-transform: uppercase; }
+                table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+                th { background: #333; color: white; padding: 8px 10px; text-align: left; font-size: 10px; text-transform: uppercase; }
+                td { padding: 7px 10px; border-bottom: 1px solid #ddd; font-size: 11px; }
+                tr:nth-child(even) { background: #f9f9f9; }
+                .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+                @media print { body { padding: 0; } }
+            </style></head><body>`;
+            html += `<h1>${sprintName}</h1>`;
+            html += `<div class="subtitle">Informe generado: ${now} - ${filteredTasks.length} tareas</div>`;
+
+            // Stats
+            html += '<div class="stats">';
+            html += `<div class="stat"><div class="val">${allTasks.length}</div><div class="lbl">Total</div></div>`;
+            html += `<div class="stat"><div class="val">${allTasks.filter(t=>t.status==='waiting qa').length}</div><div class="lbl">Pendiente Testear</div></div>`;
+            html += `<div class="stat"><div class="val">${allTasks.filter(t=>t.status==='qa').length}</div><div class="lbl">QA</div></div>`;
+            const nm = (a,s) => a.some(x=>x.name.toLowerCase().includes(s));
+            html += `<div class="stat"><div class="val">${allTasks.filter(t=>nm(t.assignees,'lucia')||nm(t.assignees,'campisi')).length}</div><div class="lbl">Lucia Campisi</div></div>`;
+            html += `<div class="stat"><div class="val">${allTasks.filter(t=>nm(t.assignees,'capacitacion')).length}</div><div class="lbl">Capacitacion AS</div></div>`;
+            html += `<div class="stat"><div class="val">${allTasks.filter(t=>nm(t.assignees,'laura')&&t.status==='qa').length}</div><div class="lbl">Laura (QA)</div></div>`;
+            html += `<div class="stat"><div class="val">${allTasks.filter(t=>nm(t.assignees,'lorena')||nm(t.assignees,'ruiz')).length}</div><div class="lbl">Lorena Ruiz</div></div>`;
+            html += '</div>';
+
+            // Table
+            html += '<table><thead><tr><th>Nombre</th><th>Estado</th><th>Prioridad</th><th>Asignado</th><th>Tags</th><th>Complejidad</th><th>Progreso</th></tr></thead><tbody>';
+            filteredTasks.forEach(t => {
+                const pc = PRIORITY_CONFIG[t.priority] || {};
+                html += `<tr>
+                    <td>${escapeHtml(t.name)}</td>
+                    <td>${t.status}</td>
+                    <td>${pc.label || t.priority}</td>
+                    <td>${t.assignees.map(a=>a.name).join(', ') || '-'}</td>
+                    <td>${t.tags.join(', ') || '-'}</td>
+                    <td>${t.complexity || '-'}</td>
+                    <td>${t.progress}%</td>
+                </tr>`;
+            });
+            html += '</tbody></table></body></html>';
+
+            const win = window.open('', '_blank');
+            win.document.write(html);
+            win.document.close();
+            setTimeout(() => { win.print(); }, 500);
+        }
 
         // Init
         loadTasks();
