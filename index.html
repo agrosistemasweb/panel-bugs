@@ -988,8 +988,8 @@
             const notDone = t => t.status !== 'done' && t.status !== 'closed';
             const noSub = allTasks.filter(t => !t.parent);
             const active = noSub.filter(notDone);
-            document.getElementById('statTotal').textContent = noSub.length;
-            document.getElementById('statWaitingQa').textContent = noSub.filter(t => t.status === 'waiting qa').length;
+            document.getElementById('statTotal').textContent = allTasks.length;
+            document.getElementById('statWaitingQa').textContent = allTasks.filter(t => t.status === 'waiting qa').length;
             document.getElementById('statQa').textContent = noSub.filter(t => t.status === 'qa').length;
             document.getElementById('statLucia').textContent = active.filter(t => nameMatch(t.assignees, 'lucia') || nameMatch(t.assignees, 'campisi')).length;
             document.getElementById('statCapacitacion').textContent = active.filter(t => nameMatch(t.assignees, 'capacitacion')).length;
