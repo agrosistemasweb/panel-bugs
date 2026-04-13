@@ -85,20 +85,28 @@
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 16px 20px;
+            padding: 12px 14px;
             min-width: 0;
             flex: 1;
         }
         .stat-card .label {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
+            white-space: nowrap;
         }
         .stat-card .value {
-            font-size: 28px;
+            font-size: 26px;
             font-weight: 700;
+        }
+        .stats-divider {
+            width: 2px;
+            background: var(--border);
+            border-radius: 1px;
+            align-self: stretch;
+            flex-shrink: 0;
         }
 
         /* Filters */
@@ -633,6 +641,10 @@
         <div class="stat-card"><div class="label">Capacitacion AS</div><div class="value" style="color:#f59e0b" id="statCapacitacion">-</div></div>
         <div class="stat-card"><div class="label">Laura (QA)</div><div class="value" style="color:#8b5cf6" id="statLaura">-</div></div>
         <div class="stat-card"><div class="label">Lorena Ruiz</div><div class="value" style="color:#3b82f6" id="statLorena">-</div></div>
+        <div class="stats-divider"></div>
+        <div class="stat-card"><div class="label">Matias Gumma</div><div class="value" style="color:#22c55e" id="statMatias">-</div></div>
+        <div class="stat-card"><div class="label">Ignacio Martin</div><div class="value" style="color:#f97316" id="statIgnacio">-</div></div>
+        <div class="stat-card"><div class="label">Tiago Roccatagliata</div><div class="value" style="color:#06b6d4" id="statTiago">-</div></div>
     </div>
 
     <!-- Filters -->
@@ -980,6 +992,9 @@
             document.getElementById('statCapacitacion').textContent = allTasks.filter(t => nameMatch(t.assignees, 'capacitacion')).length;
             document.getElementById('statLaura').textContent = allTasks.filter(t => nameMatch(t.assignees, 'laura') && t.status === 'qa').length;
             document.getElementById('statLorena').textContent = allTasks.filter(t => nameMatch(t.assignees, 'lorena') || nameMatch(t.assignees, 'ruiz')).length;
+            document.getElementById('statMatias').textContent = allTasks.filter(t => nameMatch(t.assignees, 'matias') || nameMatch(t.assignees, 'gumma')).length;
+            document.getElementById('statIgnacio').textContent = allTasks.filter(t => nameMatch(t.assignees, 'ignacio') || nameMatch(t.assignees, 'martin')).length;
+            document.getElementById('statTiago').textContent = allTasks.filter(t => nameMatch(t.assignees, 'tiago') || nameMatch(t.assignees, 'roccatagliata')).length;
         }
 
         // ---- Modal ----
