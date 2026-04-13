@@ -995,9 +995,9 @@
             document.getElementById('statCapacitacion').textContent = active.filter(t => nameMatch(t.assignees, 'capacitacion')).length;
             document.getElementById('statLaura').textContent = noSub.filter(t => nameMatch(t.assignees, 'laura') && t.status === 'qa').length;
             document.getElementById('statLorena').textContent = active.filter(t => nameMatch(t.assignees, 'lorena') || nameMatch(t.assignees, 'ruiz')).length;
-            document.getElementById('statMatias').textContent = devTasks.filter(t => nameMatch(t.assignees, 'mati') || nameMatch(t.assignees, 'fluctum')).length;
-            document.getElementById('statIgnacio').textContent = devTasks.filter(t => nameMatch(t.assignees, 'ignacio') || nameMatch(t.assignees, 'martin')).length;
-            document.getElementById('statTiago').textContent = devTasks.filter(t => nameMatch(t.assignees, 'tiago') || nameMatch(t.assignees, 'roccatagliata')).length;
+            document.getElementById('statMatias').textContent = active.filter(t => nameMatch(t.assignees, 'mati') || nameMatch(t.assignees, 'fluctum')).length;
+            document.getElementById('statIgnacio').textContent = active.filter(t => nameMatch(t.assignees, 'ignacio') || nameMatch(t.assignees, 'martin')).length;
+            document.getElementById('statTiago').textContent = active.filter(t => nameMatch(t.assignees, 'tiago') || nameMatch(t.assignees, 'roccatagliata')).length;
         }
 
         // ---- Modal ----
