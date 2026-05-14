@@ -640,7 +640,7 @@
         <div class="stat-card"><div class="label">QA</div><div class="value" style="color:#1090e0" id="statQa">-</div></div>
         <div class="stat-card"><div class="label">Lucia Campisi</div><div class="value" style="color:#ec4899" id="statLucia">-</div></div>
         <div class="stat-card"><div class="label">Capacitacion AS</div><div class="value" style="color:#f59e0b" id="statCapacitacion">-</div></div>
-        <div class="stat-card"><div class="label">Laura (QA)</div><div class="value" style="color:#8b5cf6" id="statLaura">-</div></div>
+        <div class="stat-card"><div class="label">Laura</div><div class="value" style="color:#8b5cf6" id="statLaura">-</div></div>
         <div class="stat-card"><div class="label">Lorena Ruiz</div><div class="value" style="color:#3b82f6" id="statLorena">-</div></div>
         <div class="stats-divider"></div>
         <div class="stat-card"><div class="label">Matias Gumma</div><div class="value" style="color:#22c55e" id="statMatias">-</div></div>
@@ -986,19 +986,18 @@
         function updateStats() {
             const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
             const nameMatch = (assignees, search) => assignees.some(a => norm(a.name).includes(search));
-            const notDone = t => t.status !== 'done' && t.status !== 'closed';
             const noSub = allTasks.filter(t => !t.parent);
-            const active = noSub.filter(notDone);
             document.getElementById('statTotal').textContent = allTasks.length;
-            document.getElementById('statWaitingQa').textContent = allTasks.filter(t => t.status === 'waiting qa').length;
-            document.getElementById('statQa').textContent = noSub.filter(t => t.status === 'qa').length;
-            document.getElementById('statLucia').textContent = active.filter(t => nameMatch(t.assignees, 'lucia') || nameMatch(t.assignees, 'campisi')).length;
-            document.getElementById('statCapacitacion').textContent = active.filter(t => nameMatch(t.assignees, 'capacitacion')).length;
-            document.getElementById('statLaura').textContent = noSub.filter(t => nameMatch(t.assignees, 'laura') && t.status === 'qa').length;
-            document.getElementById('statLorena').textContent = active.filter(t => nameMatch(t.assignees, 'lorena') || nameMatch(t.assignees, 'ruiz')).length;
-            document.getElementById('statMatias').textContent = active.filter(t => nameMatch(t.assignees, 'mati') || nameMatch(t.assignees, 'fluctum')).length;
-            document.getElementById('statIgnacio').textContent = active.filter(t => nameMatch(t.assignees, 'ignacio') || nameMatch(t.assignees, 'martin')).length;
-            document.getElementById('statTiago').textContent = active.filter(t => nameMatch(t.assignees, 'tiago') || nameMatch(t.assignees, 'roccatagliata')).length;
+            document.getElementById('statWaitingQa').textContent = allTasks.filter(t => t.status === 'listo  para qa' || t.status === 'listo para qa').length;
+            document.getElementById('statQa').textContent = noSub.filter(t => t.status === 'en qa').length;
+            // Conteo por asignado: total de tareas no-subtarea asignadas (consistente con la vista de ClickUp filtrando por persona)
+            document.getElementById('statLucia').textContent = noSub.filter(t => nameMatch(t.assignees, 'lucia') || nameMatch(t.assignees, 'campisi')).length;
+            document.getElementById('statCapacitacion').textContent = noSub.filter(t => nameMatch(t.assignees, 'capacitacion')).length;
+            document.getElementById('statLaura').textContent = noSub.filter(t => nameMatch(t.assignees, 'laura')).length;
+            document.getElementById('statLorena').textContent = noSub.filter(t => nameMatch(t.assignees, 'lorena') || nameMatch(t.assignees, 'ruiz')).length;
+            document.getElementById('statMatias').textContent = noSub.filter(t => nameMatch(t.assignees, 'mati') || nameMatch(t.assignees, 'fluctum')).length;
+            document.getElementById('statIgnacio').textContent = noSub.filter(t => nameMatch(t.assignees, 'ignacio') || nameMatch(t.assignees, 'martin')).length;
+            document.getElementById('statTiago').textContent = noSub.filter(t => nameMatch(t.assignees, 'tiago') || nameMatch(t.assignees, 'roccatagliata')).length;
         }
 
         // ---- Modal ----
@@ -1265,13 +1264,14 @@
             // Stats
             html += '<div class="stats">';
             html += `<div class="stat"><div class="val">${allTasks.length}</div><div class="lbl">Total</div></div>`;
-            html += `<div class="stat"><div class="val">${allTasks.filter(t=>t.status==='waiting qa').length}</div><div class="lbl">Pendiente Testear</div></div>`;
-            html += `<div class="stat"><div class="val">${allTasks.filter(t=>t.status==='qa').length}</div><div class="lbl">QA</div></div>`;
+            html += `<div class="stat"><div class="val">${allTasks.filter(t=>t.status==='listo  para qa'||t.status==='listo para qa').length}</div><div class="lbl">Pendiente Testear</div></div>`;
+            html += `<div class="stat"><div class="val">${allTasks.filter(t=>t.status==='en qa').length}</div><div class="lbl">QA</div></div>`;
             const nm = (a,s) => a.some(x=>x.name.toLowerCase().includes(s));
-            html += `<div class="stat"><div class="val">${allTasks.filter(t=>nm(t.assignees,'lucia')||nm(t.assignees,'campisi')).length}</div><div class="lbl">Lucia Campisi</div></div>`;
-            html += `<div class="stat"><div class="val">${allTasks.filter(t=>nm(t.assignees,'capacitacion')).length}</div><div class="lbl">Capacitacion AS</div></div>`;
-            html += `<div class="stat"><div class="val">${allTasks.filter(t=>nm(t.assignees,'laura')&&t.status==='qa').length}</div><div class="lbl">Laura (QA)</div></div>`;
-            html += `<div class="stat"><div class="val">${allTasks.filter(t=>nm(t.assignees,'lorena')||nm(t.assignees,'ruiz')).length}</div><div class="lbl">Lorena Ruiz</div></div>`;
+            const noSubE = allTasks.filter(t=>!t.parent);
+            html += `<div class="stat"><div class="val">${noSubE.filter(t=>nm(t.assignees,'lucia')||nm(t.assignees,'campisi')).length}</div><div class="lbl">Lucia Campisi</div></div>`;
+            html += `<div class="stat"><div class="val">${noSubE.filter(t=>nm(t.assignees,'capacitacion')).length}</div><div class="lbl">Capacitacion AS</div></div>`;
+            html += `<div class="stat"><div class="val">${noSubE.filter(t=>nm(t.assignees,'laura')).length}</div><div class="lbl">Laura</div></div>`;
+            html += `<div class="stat"><div class="val">${noSubE.filter(t=>nm(t.assignees,'lorena')||nm(t.assignees,'ruiz')).length}</div><div class="lbl">Lorena Ruiz</div></div>`;
             html += '</div>';
 
             // Table
