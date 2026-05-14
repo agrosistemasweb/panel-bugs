@@ -826,6 +826,11 @@
                     page++;
                 }
 
+                // Excluir cerrado/closed/automation del dataset (consistencia con panel-modulo-contable).
+                // Esto garantiza que sumando manualmente las tarjetas visibles se llega al mismo total que muestra el panel.
+                const EXCLUDED_STATUSES = new Set(['cerrado', 'closed', 'automation']);
+                tasks = tasks.filter(t => !EXCLUDED_STATUSES.has((t.status?.status || '').toLowerCase()));
+
                 allTasks = tasks.map(t => ({
                     id: t.id,
                     name: t.name,
