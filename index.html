@@ -616,12 +616,7 @@
     <div class="header">
         <h1>
             <select class="filter-select" id="sprintSelector" onchange="onSprintChange()" style="font-size:18px;font-weight:600;padding:6px 12px;border-radius:8px;">
-                <option value="901323690606">Sprint 1 - Modulo Contable</option>
-                <option value="901324230121">Sprint 2 - Modulo Contable</option>
-                <option value="901324539845">Sprint 3 - Modulo Contable</option>
-                <option value="901325316130">Sprint 4 - Modulo Contable</option>
-                <option value="901326731539">Sprint 5 - Modulo Contable</option>
-                <option value="901327168887" selected>Sprint 6 - Modulo Contable</option>
+                <option value="">Cargando sprints...</option>
             </select>
             <span class="badge" id="totalBadge">...</span>
         </h1>
@@ -638,14 +633,9 @@
         <div class="stat-card"><div class="label">Total</div><div class="value" id="statTotal">-</div></div>
         <div class="stat-card"><div class="label">Pendiente Testear</div><div class="value" style="color:#ffc53d" id="statWaitingQa">-</div></div>
         <div class="stat-card"><div class="label">QA</div><div class="value" style="color:#1090e0" id="statQa">-</div></div>
-        <div class="stat-card"><div class="label">Lucia Campisi</div><div class="value" style="color:#ec4899" id="statLucia">-</div></div>
-        <div class="stat-card"><div class="label">Capacitacion AS</div><div class="value" style="color:#f59e0b" id="statCapacitacion">-</div></div>
-        <div class="stat-card"><div class="label">Laura</div><div class="value" style="color:#8b5cf6" id="statLaura">-</div></div>
-        <div class="stat-card"><div class="label">Lorena Ruiz</div><div class="value" style="color:#3b82f6" id="statLorena">-</div></div>
         <div class="stats-divider"></div>
-        <div class="stat-card"><div class="label">Matias Gumma</div><div class="value" style="color:#22c55e" id="statMatias">-</div></div>
-        <div class="stat-card"><div class="label">Ignacio Martin</div><div class="value" style="color:#f97316" id="statIgnacio">-</div></div>
-        <div class="stat-card"><div class="label">Tiago Roccatagliata</div><div class="value" style="color:#06b6d4" id="statTiago">-</div></div>
+        <!-- Tarjetas de recursos generadas dinamicamente segun quien este asignado en el sprint -->
+        <div id="assigneeStats" style="display:contents"></div>
     </div>
 
     <!-- Filters -->
@@ -757,8 +747,44 @@
         // =============================================================
         // URL del Cloudflare Worker
         const WORKER_URL = 'https://panel-bugs-proxy.lorena-ruiz-e63.workers.dev';
-        let LIST_ID = '901327168887';
+        // Folder de los Sprints del Modulo Contable (se leen dinamicamente para
+        // que cada sprint nuevo aparezca solo y se seleccione el activo).
+        const SPRINT_FOLDER_ID = '901316203875';
+        let LIST_ID = '';
         // =============================================================
+
+        function parseSprintNum(name) {
+            const m = (name || '').match(/sprint\s*(\d+)/i);
+            return m ? parseInt(m[1], 10) : 1; // "Sprint Modulo Contable" => Sprint 1
+        }
+        function cleanSprintName(name) {
+            return `Sprint ${parseSprintNum(name)} - Modulo Contable`;
+        }
+
+        // Carga las listas del folder, arma el selector y elige el sprint activo
+        // (el de mayor numero entre los no archivados).
+        async function initSprints() {
+            const sel = document.getElementById('sprintSelector');
+            try {
+                const data = await apiGet(`/api/folder/${SPRINT_FOLDER_ID}/list`);
+                const lists = (data.lists || [])
+                    .filter(l => !l.archived)
+                    .map(l => ({ id: l.id, num: parseSprintNum(l.name), name: cleanSprintName(l.name) }))
+                    .sort((a, b) => a.num - b.num);
+                if (lists.length) {
+                    sel.innerHTML = lists.map(l => `<option value="${l.id}">${escapeHtml(l.name)}</option>`).join('');
+                    const current = lists[lists.length - 1]; // sprint activo = mayor numero
+                    sel.value = current.id;
+                    LIST_ID = current.id;
+                }
+            } catch (err) {
+                console.warn('No se pudieron cargar los sprints dinamicamente:', err);
+                sel.innerHTML = '<option value="901327484231">Sprint 7 - Modulo Contable</option>';
+                sel.value = '901327484231';
+                LIST_ID = '901327484231';
+            }
+            loadTasks();
+        }
 
         function onSprintChange() {
             LIST_ID = document.getElementById('sprintSelector').value;
@@ -989,20 +1015,25 @@
         }
 
         function updateStats() {
-            const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-            const nameMatch = (assignees, search) => assignees.some(a => norm(a.name).includes(search));
             const noSub = allTasks.filter(t => !t.parent);
             document.getElementById('statTotal').textContent = allTasks.length;
             document.getElementById('statWaitingQa').textContent = noSub.filter(t => t.status === 'listo  para qa' || t.status === 'listo para qa').length;
             document.getElementById('statQa').textContent = noSub.filter(t => t.status === 'en qa').length;
-            // Conteo por asignado: total de tareas no-subtarea asignadas (consistente con la vista de ClickUp filtrando por persona)
-            document.getElementById('statLucia').textContent = noSub.filter(t => nameMatch(t.assignees, 'lucia') || nameMatch(t.assignees, 'campisi')).length;
-            document.getElementById('statCapacitacion').textContent = noSub.filter(t => nameMatch(t.assignees, 'capacitacion')).length;
-            document.getElementById('statLaura').textContent = noSub.filter(t => nameMatch(t.assignees, 'laura')).length;
-            document.getElementById('statLorena').textContent = noSub.filter(t => nameMatch(t.assignees, 'lorena') || nameMatch(t.assignees, 'ruiz')).length;
-            document.getElementById('statMatias').textContent = noSub.filter(t => nameMatch(t.assignees, 'mati') || nameMatch(t.assignees, 'fluctum')).length;
-            document.getElementById('statIgnacio').textContent = noSub.filter(t => nameMatch(t.assignees, 'ignacio') || nameMatch(t.assignees, 'martin')).length;
-            document.getElementById('statTiago').textContent = noSub.filter(t => nameMatch(t.assignees, 'tiago') || nameMatch(t.assignees, 'roccatagliata')).length;
+
+            // Asignaciones reales: una tarjeta por persona realmente asignada en el sprint,
+            // contando tareas principales (no subtareas), ordenadas de mayor a menor.
+            const byPerson = {};
+            noSub.forEach(t => t.assignees.forEach(a => {
+                if (!byPerson[a.name]) byPerson[a.name] = { count: 0, color: a.color };
+                byPerson[a.name].count++;
+            }));
+            const people = Object.entries(byPerson).sort((a, b) => b[1].count - a[1].count);
+            const cont = document.getElementById('assigneeStats');
+            cont.innerHTML = people.length
+                ? people.map(([name, info], i) =>
+                    `<div class="stat-card"><div class="label" title="${escapeHtml(name)}">${escapeHtml(name)}</div><div class="value" style="color:${info.color || ASSIGNEE_COLORS[i % ASSIGNEE_COLORS.length]}">${info.count}</div></div>`
+                  ).join('')
+                : '<div class="stat-card"><div class="label">Sin asignados</div><div class="value">-</div></div>';
         }
 
         // ---- Modal ----
@@ -1267,16 +1298,17 @@
             html += `<div class="subtitle">Informe generado: ${now} - ${filteredTasks.length} tareas</div>`;
 
             // Stats
-            const nm = (a,s) => a.some(x=>x.name.toLowerCase().includes(s));
             const noSubE = allTasks.filter(t=>!t.parent);
             html += '<div class="stats">';
             html += `<div class="stat"><div class="val">${allTasks.length}</div><div class="lbl">Total</div></div>`;
             html += `<div class="stat"><div class="val">${noSubE.filter(t=>t.status==='listo  para qa'||t.status==='listo para qa').length}</div><div class="lbl">Pendiente Testear</div></div>`;
             html += `<div class="stat"><div class="val">${noSubE.filter(t=>t.status==='en qa').length}</div><div class="lbl">QA</div></div>`;
-            html += `<div class="stat"><div class="val">${noSubE.filter(t=>nm(t.assignees,'lucia')||nm(t.assignees,'campisi')).length}</div><div class="lbl">Lucia Campisi</div></div>`;
-            html += `<div class="stat"><div class="val">${noSubE.filter(t=>nm(t.assignees,'capacitacion')).length}</div><div class="lbl">Capacitacion AS</div></div>`;
-            html += `<div class="stat"><div class="val">${noSubE.filter(t=>nm(t.assignees,'laura')).length}</div><div class="lbl">Laura</div></div>`;
-            html += `<div class="stat"><div class="val">${noSubE.filter(t=>nm(t.assignees,'lorena')||nm(t.assignees,'ruiz')).length}</div><div class="lbl">Lorena Ruiz</div></div>`;
+            // Asignaciones reales (dinamicas)
+            const byPersonPDF = {};
+            noSubE.forEach(t => t.assignees.forEach(a => { byPersonPDF[a.name] = (byPersonPDF[a.name]||0)+1; }));
+            Object.entries(byPersonPDF).sort((a,b)=>b[1]-a[1]).forEach(([name,count]) => {
+                html += `<div class="stat"><div class="val">${count}</div><div class="lbl">${escapeHtml(name)}</div></div>`;
+            });
             html += '</div>';
 
             // Table
@@ -1301,8 +1333,8 @@
             setTimeout(() => { win.print(); }, 500);
         }
 
-        // Init
-        loadTasks();
-    </script>
+        // Init — carga sprints dinamicamente y arranca en el sprint activo
+        initSprints();
+</script>
 </body>
 </html>
