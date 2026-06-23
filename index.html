@@ -1021,9 +1021,11 @@
             document.getElementById('statQa').textContent = noSub.filter(t => t.status === 'en qa').length;
 
             // Asignaciones reales: una tarjeta por persona realmente asignada en el sprint,
-            // contando tareas principales (no subtareas), ordenadas de mayor a menor.
+            // contando TODAS las tareas asignadas (principales + subtareas), ordenadas de
+            // mayor a menor. Las QA suelen tener su trabajo en subtareas, asi que contar
+            // solo principales dejaba sus totalizadores en 0.
             const byPerson = {};
-            noSub.forEach(t => t.assignees.forEach(a => {
+            allTasks.forEach(t => t.assignees.forEach(a => {
                 if (!byPerson[a.name]) byPerson[a.name] = { count: 0, color: a.color };
                 byPerson[a.name].count++;
             }));
@@ -1303,9 +1305,9 @@
             html += `<div class="stat"><div class="val">${allTasks.length}</div><div class="lbl">Total</div></div>`;
             html += `<div class="stat"><div class="val">${noSubE.filter(t=>t.status==='listo  para qa'||t.status==='listo para qa').length}</div><div class="lbl">Pendiente Testear</div></div>`;
             html += `<div class="stat"><div class="val">${noSubE.filter(t=>t.status==='en qa').length}</div><div class="lbl">QA</div></div>`;
-            // Asignaciones reales (dinamicas)
+            // Asignaciones reales (dinamicas) — todas las tareas asignadas, incl. subtareas
             const byPersonPDF = {};
-            noSubE.forEach(t => t.assignees.forEach(a => { byPersonPDF[a.name] = (byPersonPDF[a.name]||0)+1; }));
+            allTasks.forEach(t => t.assignees.forEach(a => { byPersonPDF[a.name] = (byPersonPDF[a.name]||0)+1; }));
             Object.entries(byPersonPDF).sort((a,b)=>b[1]-a[1]).forEach(([name,count]) => {
                 html += `<div class="stat"><div class="val">${count}</div><div class="lbl">${escapeHtml(name)}</div></div>`;
             });
