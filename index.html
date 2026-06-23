@@ -845,11 +845,15 @@
                 let page = 0;
                 let hasMore = true;
 
+                // ClickUp con subtasks=true puede devolver paginas de <100 sin ser la
+                // ultima: hay que cortar por el flag last_page, no por la cantidad.
+                // (Cortar por length===100 truncaba el sprint y perdia asignados.)
                 while (hasMore) {
                     const data = await apiGet(`/api/tasks?list_id=${LIST_ID}&page=${page}&include_closed=true&subtasks=true`);
-                    tasks = tasks.concat(data.tasks);
-                    hasMore = data.tasks.length === 100;
+                    tasks = tasks.concat(data.tasks || []);
+                    hasMore = data.last_page === false && (data.tasks || []).length > 0;
                     page++;
+                    if (page > 100) break; // tope de seguridad
                 }
 
                 // Excluir cerrado/closed/automation del dataset (consistencia con panel-modulo-contable).
