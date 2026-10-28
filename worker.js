@@ -11,7 +11,7 @@ const CLICKUP_API = 'https://api.clickup.com/api/v2';
 
 // Origenes permitidos - Agregar tu dominio de GitHub Pages
 const ALLOWED_ORIGINS = [
-  'https://TU-USUARIO.github.io',   // <-- CAMBIAR por tu usuario de GitHub
+  'https://agrosistemasweb.github.io',
   'http://localhost',
   'http://127.0.0.1',
   'null' // para archivos locales
@@ -105,6 +105,37 @@ export default {
             },
             body: JSON.stringify(safeBody)
           }
+        );
+        const data = await resp.json();
+        return jsonResponse(data, resp.status, request);
+      }
+
+      // ---- GET /api/state/:key (leer estado del panel desde KV) ----
+      if (path.match(/^\/api\/state\/[^/]+$/) && request.method === 'GET') {
+        const key = path.split('/')[3];
+        if (!env.PANEL_STATE) return jsonResponse({ error:'KV no configurado' }, 500, request);
+        const data = await env.PANEL_STATE.get(key, { type: 'json' });
+        return jsonResponse(data || {}, 200, request);
+      }
+
+      // ---- POST /api/state/:key (escribir estado del panel a KV) ----
+      if (path.match(/^\/api\/state\/[^/]+$/) && request.method === 'POST') {
+        const key = path.split('/')[3];
+        if (!env.PANEL_STATE) return jsonResponse({ error:'KV no configurado' }, 500, request);
+        const body = await request.json();
+        // limite de tamano razonable (~25KB)
+        const str = JSON.stringify(body);
+        if (str.length > 25000) return jsonResponse({ error:'payload demasiado grande' }, 413, request);
+        await env.PANEL_STATE.put(key, str);
+        return jsonResponse({ ok:true, size: str.length }, 200, request);
+      }
+
+      // ---- GET /api/folder/:id/list (listar listas de un folder) ----
+      if (path.match(/^\/api\/folder\/[^/]+\/list$/) && request.method === 'GET') {
+        const folderId = path.split('/')[3];
+        const resp = await fetch(
+          `${CLICKUP_API}/folder/${folderId}/list`,
+          { headers: { 'Authorization': API_TOKEN } }
         );
         const data = await resp.json();
         return jsonResponse(data, resp.status, request);
