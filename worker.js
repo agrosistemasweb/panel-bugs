@@ -11,7 +11,7 @@ const CLICKUP_API = 'https://api.clickup.com/api/v2';
 
 // Origenes permitidos - Agregar tu dominio de GitHub Pages
 const ALLOWED_ORIGINS = [
-  'https://TU-USUARIO.github.io',   // <-- CAMBIAR por tu usuario de GitHub
+  'https://agrosistemasweb.github.io',
   'http://localhost',
   'http://127.0.0.1',
   'null' // para archivos locales
@@ -26,6 +26,56 @@ function corsHeaders(request) {
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '86400',
   };
+}
+
+// Caché de lecturas: todos los paneles comparten el token de ClickUp (100 consultas/min).
+// Sin caché, cada persona con un panel abierto relee todo y se pasa el límite (429).
+// Una misma lectura se sirve desde memoria durante MEMO_TTL; si ClickUp devuelve 429
+// o falla, se sirve la última lectura buena (hasta MEMO_STALE) en lugar del error.
+// Las lecturas iguales que llegan a la vez esperan a la misma consulta.
+// (La Cache API no funciona en *.workers.dev: por eso va en memoria del worker.)
+const MEMO = new Map();          // url -> { ts, status, body } | { p:Promise, viejo }
+const MEMO_TTL = 60 * 1000;
+const MEMO_STALE = 15 * 60 * 1000;
+
+async function cachedGet(clickupUrl, token) {
+  const ahora = Date.now();
+  const hit = MEMO.get(clickupUrl);
+  if (hit && hit.p) return { ...(await hit.p), cache:'ESPERA' };
+  if (hit && ahora - hit.ts < MEMO_TTL) return { ...hit, cache:'HIT' };
+
+  const viejo = hit && ahora - hit.ts < MEMO_STALE ? hit : null;
+  const p = (async () => {
+    try {
+      const resp = await fetch(clickupUrl, { headers: { 'Authorization': token } });
+      const body = await resp.text();
+      if (resp.status === 200) return { ts: Date.now(), status: 200, body };
+      if (viejo) return { ...viejo, cache:'VIEJO' };
+      return { ts: 0, status: resp.status, body };
+    } catch (e) {
+      if (viejo) return { ...viejo, cache:'VIEJO' };
+      throw e;
+    }
+  })();
+  MEMO.set(clickupUrl, { p });
+  try {
+    const r = await p;
+    if (r.status === 200 && !r.cache) MEMO.set(clickupUrl, r);
+    else if (viejo) MEMO.set(clickupUrl, viejo);
+    else MEMO.delete(clickupUrl);
+    if (MEMO.size > 2000) MEMO.delete(MEMO.keys().next().value);
+    return { cache:'MISS', ...r };
+  } catch (e) {
+    MEMO.delete(clickupUrl);
+    throw e;
+  }
+}
+
+function cachedResponse(r, request) {
+  return new Response(r.body, {
+    status: r.status,
+    headers: { 'Content-Type': 'application/json', 'X-Cache': r.cache, ...corsHeaders(request) }
+  });
 }
 
 export default {
@@ -54,12 +104,11 @@ export default {
         const includeClosed = url.searchParams.get('include_closed') || 'true';
         const subtasks = url.searchParams.get('subtasks') || 'true';
 
-        const resp = await fetch(
+        const r = await cachedGet(
           `${CLICKUP_API}/list/${listId}/task?include_closed=${includeClosed}&subtasks=${subtasks}&page=${page}`,
-          { headers: { 'Authorization': API_TOKEN } }
+          API_TOKEN
         );
-        const data = await resp.json();
-        return jsonResponse(data, resp.status, request);
+        return cachedResponse(r, request);
       }
 
       // ---- GET /api/task/:id (detalle con attachments) ----
@@ -108,6 +157,33 @@ export default {
         );
         const data = await resp.json();
         return jsonResponse(data, resp.status, request);
+      }
+
+      // ---- GET /api/state/:key (leer estado del panel desde KV) ----
+      if (path.match(/^\/api\/state\/[^/]+$/) && request.method === 'GET') {
+        const key = path.split('/')[3];
+        if (!env.PANEL_STATE) return jsonResponse({ error:'KV no configurado' }, 500, request);
+        const data = await env.PANEL_STATE.get(key, { type: 'json' });
+        return jsonResponse(data || {}, 200, request);
+      }
+
+      // ---- POST /api/state/:key (escribir estado del panel a KV) ----
+      if (path.match(/^\/api\/state\/[^/]+$/) && request.method === 'POST') {
+        const key = path.split('/')[3];
+        if (!env.PANEL_STATE) return jsonResponse({ error:'KV no configurado' }, 500, request);
+        const body = await request.json();
+        // limite de tamano razonable (~25KB)
+        const str = JSON.stringify(body);
+        if (str.length > 25000) return jsonResponse({ error:'payload demasiado grande' }, 413, request);
+        await env.PANEL_STATE.put(key, str);
+        return jsonResponse({ ok:true, size: str.length }, 200, request);
+      }
+
+      // ---- GET /api/folder/:id/list (listar listas de un folder) ----
+      if (path.match(/^\/api\/folder\/[^/]+\/list$/) && request.method === 'GET') {
+        const folderId = path.split('/')[3];
+        const r = await cachedGet(`${CLICKUP_API}/folder/${folderId}/list`, API_TOKEN);
+        return cachedResponse(r, request);
       }
 
       // ---- GET /api/list/:id/field ----
