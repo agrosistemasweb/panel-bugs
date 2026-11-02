@@ -25,6 +25,9 @@ function corsHeaders(request) {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '86400',
+    // Para que el panel sepa si le llegó una lectura vieja (X-Cache: VIEJO) y no la
+    // muestre como si fuera la de ahora.
+    'Access-Control-Expose-Headers': 'X-Cache',
   };
 }
 
