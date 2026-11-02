@@ -47,7 +47,10 @@ async function cachedGet(clickupUrl, token) {
   const viejo = hit && ahora - hit.ts < MEMO_STALE ? hit : null;
   const p = (async () => {
     try {
-      const resp = await fetch(clickupUrl, { headers: { 'Authorization': token } });
+      // Tope de 15 s: sin esto una consulta colgada quedaba en MEMO como promesa
+      // pendiente y TODOS los pedidos iguales la esperaban para siempre («ESPERA»).
+      const resp = await fetch(clickupUrl, { headers: { 'Authorization': token },
+                                             signal: AbortSignal.timeout(15000) });
       const body = await resp.text();
       if (resp.status === 200) return { ts: Date.now(), status: 200, body };
       if (viejo) return { ...viejo, cache:'VIEJO' };
