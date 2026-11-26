@@ -84,6 +84,47 @@ function cachedResponse(r, request) {
   });
 }
 
+// ---- Linear (solo lectura) ----
+// Resume todos los issues del workspace por proyecto y por estado. La consulta es fija:
+// el panel no puede mandar GraphQL propio. Usa el secret LINEAR_API_KEY (key de solo lectura).
+const LINEAR_API = 'https://api.linear.app/graphql';
+const LINEAR_TTL = 5 * 60 * 1000;
+let LINEAR_MEMO = null;            // { ts, body }
+const LINEAR_QUERY = `query($after:String){ issues(first:250, after:$after, includeArchived:false){
+  pageInfo{ hasNextPage endCursor }
+  nodes{ identifier title url updatedAt state{ name type } project{ id name } team{ key name } } } }`;
+
+async function linearEstado(key) {
+  const proyectos = {};
+  let after = null, total = 0;
+  for (let pag = 0; pag < 20; pag++) {
+    const resp = await fetch(LINEAR_API, {
+      method: 'POST',
+      headers: { 'Authorization': key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: LINEAR_QUERY, variables: { after } }),
+      signal: AbortSignal.timeout(15000)
+    });
+    const j = await resp.json();
+    if (resp.status !== 200 || j.errors) {
+      return { status: resp.status === 200 ? 502 : resp.status,
+               body: JSON.stringify({ error: 'Linear respondió con error', detalle: j.errors || j }) };
+    }
+    for (const i of j.data.issues.nodes) {
+      total++;
+      const nom = i.project ? i.project.name : '(sin proyecto)';
+      const p = proyectos[nom] || (proyectos[nom] = { proyecto: nom, total: 0, porTipo: {}, porEstado: {}, issues: [] });
+      const tipo = i.state.type;   // backlog | unstarted | started | completed | canceled | triage
+      p.total++;
+      p.porTipo[tipo] = (p.porTipo[tipo] || 0) + 1;
+      p.porEstado[i.state.name] = (p.porEstado[i.state.name] || 0) + 1;
+      p.issues.push({ id: i.identifier, t: i.title, u: i.url, st: i.state.name, tipo, eq: i.team && i.team.key });
+    }
+    if (!j.data.issues.pageInfo.hasNextPage) break;
+    after = j.data.issues.pageInfo.endCursor;
+  }
+  return { status: 200, body: JSON.stringify({ leido: new Date().toISOString(), total, proyectos: Object.values(proyectos) }) };
+}
+
 export default {
   async fetch(request, env) {
     // Preflight CORS
@@ -101,6 +142,20 @@ export default {
     }
 
     try {
+      // ---- GET /api/linear/estado (issues de Linear agrupados por proyecto y estado) ----
+      if (path === '/api/linear/estado' && request.method === 'GET') {
+        if (!env.LINEAR_API_KEY) return jsonResponse({ error: 'LINEAR_API_KEY no configurada en el worker' }, 500, request);
+        const ahora = Date.now();
+        if (LINEAR_MEMO && ahora - LINEAR_MEMO.ts < LINEAR_TTL)
+          return cachedResponse({ body: LINEAR_MEMO.body, status: 200, cache: 'HIT' }, request);
+        let r;
+        try { r = await linearEstado(env.LINEAR_API_KEY); }
+        catch (e) { r = { status: 502, body: JSON.stringify({ error: 'No se pudo leer Linear: ' + e.message }) }; }
+        if (r.status === 200) { LINEAR_MEMO = { ts: ahora, body: r.body }; return cachedResponse({ ...r, cache: 'MISS' }, request); }
+        if (LINEAR_MEMO) return cachedResponse({ body: LINEAR_MEMO.body, status: 200, cache: 'VIEJO' }, request);
+        return cachedResponse({ ...r, cache: 'MISS' }, request);
+      }
+
       // ---- GET /api/tasks?list_id=XXX&page=0&include_closed=true ----
       if (path === '/api/tasks' && request.method === 'GET') {
         const listId = url.searchParams.get('list_id');
